@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import { HfInference } from "@huggingface/inference";
+import OpenAI from "openai";
 
 dotenv.config();
 
@@ -11,43 +12,58 @@ app.use(express.json());
 
 const hf = new HfInference(process.env.HUGGINGFACE_API_KEY);
 
+// Check if the API key is available
+const openaiApiKey = process.env.OPENAI_API_KEY;
+if (!openaiApiKey) {
+  console.error("OPENAI_API_KEY is not set in the environment variables");
+  process.exit(1);
+}
+
+const openai = new OpenAI({
+  apiKey: openaiApiKey,
+});
+
 app.post("/generate-story", async (req, res) => {
   try {
     const {
-      genre,
-      childMood,
-      readingTime,
-      characters,
-      moral,
-      childAge,
-      setting,
-      theme,
-      favoriteAnimal,
-      learningGoal,
+      genre = "",
+      childMood = "",
+      readingTime = "",
+      characters = "",
+      moral = false,
+      childAge = "",
+      setting = "",
+      theme = "",
+      favoriteAnimal = "",
+      learningGoal = "",
     } = req.body;
 
-    const prompt = `Generate a ${genre} bedtime story for a ${childAge}-year-old child who is feeling ${childMood}. 
-    The story should take about ${readingTime} minutes to read and include ${characters} characters. 
-    Set the story in ${setting} and focus on the theme of ${theme}.
-    Include a ${favoriteAnimal} as one of the characters if possible.
-    The story should teach about ${learningGoal}.
-    ${moral ? "The story should have a moral lesson." : ""}`;
+    const prompt = `Write a short bedtime story with the following characteristics:
+    - Genre: ${genre || "any"}
+    - For a child who is feeling: ${childMood || "any mood"}
+    - Reading time: about ${readingTime || "5"} minutes
+    - Number of characters: ${characters || "any"}
+    - Include a moral lesson: ${moral ? "Yes" : "No"}
+    - Child's age: ${childAge || "any"} years old
+    - Setting: ${setting || "any"}
+    - Theme: ${theme || "any"}
+    - Include this animal if possible: ${favoriteAnimal || "any"}
+    - Learning goal: ${learningGoal || "none specified"}
 
-    const response = await hf.textGeneration({
-      model: "gpt2",
-      inputs: prompt,
-      parameters: {
-        max_new_tokens: 250,
-        return_full_text: false,
-        num_return_sequences: 3,
-      },
+    The story should be engaging, appropriate for the child's age, and follow a clear narrative structure. Begin the story now:`;
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.7,
+      max_tokens: 1000,
     });
 
-    const stories = Array.isArray(response)
-      ? response.map((r) => r.generated_text)
-      : [response.generated_text];
+    const story =
+      completion.choices[0]?.message?.content?.trim() ||
+      "Sorry, I couldn't generate a story at this time.";
 
-    res.json({ stories });
+    res.json({ stories: [story] });
   } catch (error) {
     console.error("Error generating story:", error);
     res
