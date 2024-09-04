@@ -1,44 +1,40 @@
-import React from "react";
-import axios from "axios";
+import React, { useState } from "react";
+import LoadingIndicator from "./LoadingIndicator";
 
-interface StoryListProps {
-  stories: string[];
-  onCoverGenerated: (imageUrl: string, storyIndex: number) => void;
+interface Story {
+  text: string;
+  coverUrl: string;
 }
 
-const StoryList: React.FC<StoryListProps> = ({ stories, onCoverGenerated }) => {
-  const generateCover = async (story: string, index: number) => {
-    try {
-      const response = await axios.post(
-        "http://localhost:3001/generate-cover",
-        {
-          prompt: `Book cover for a children's story: ${story.substring(
-            0,
-            100
-          )}...`,
-        }
-      );
-      onCoverGenerated(response.data.imageUrl, index);
-    } catch (error) {
-      console.error("Error generating cover:", error);
-    }
-  };
+interface StoryListProps {
+  stories: Story[];
+  isLoading: boolean;
+}
+
+const StoryList: React.FC<StoryListProps> = ({ stories, isLoading }) => {
+  const [expandedStory, setExpandedStory] = useState<number | null>(null);
 
   return (
-    <div className="space-y-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
       {stories.map((story, index) => (
-        <div key={index} className="border rounded-lg p-4">
-          <h3 className="text-lg font-semibold mb-2">Story {index + 1}</h3>
-          <p className="mb-4">
-            {story || "No story generated. Please try again."}
-          </p>
-          {story && (
-            <button
-              onClick={() => generateCover(story, index)}
-              className="py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-            >
-              Generate Cover
-            </button>
+        <div key={index} className="border rounded-lg p-4 h-[25rem]">
+          {isLoading || !story.coverUrl ? (
+            <LoadingIndicator />
+          ) : (
+            <>
+              <img
+                src={story.coverUrl}
+                alt={`Cover for Story ${index + 1}`}
+                className="w-full h-full object-cover mb-4 cursor-pointer"
+                onClick={() =>
+                  setExpandedStory(expandedStory === index ? null : index)
+                }
+              />
+              <h3 className="text-lg font-semibold mb-2">Story {index + 1}</h3>
+              {expandedStory === index && (
+                <p className="mb-4 overflow-y-auto">{story.text}</p>
+              )}
+            </>
           )}
         </div>
       ))}
